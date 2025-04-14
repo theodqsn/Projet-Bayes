@@ -1,0 +1,59 @@
+---
+title: "Notebook final"
+format: html
+editor: visual
+---
+
+on commence par definir les lois marginales 
+
+```{r}
+marginale_lambda_1<- function(y,T, P, tau, theta){
+  sigma_0_carre = 10^6
+  sigma_carre = 1/tau 
+  mu_0 = 0
+  x <- y - (T-1)*theta #T-1 est une indicatrice de l'appartenance à la classe 2
+  n<- length(x)
+  
+  sigma_carre_f = 1/(1/sigma_0_carre + n/sigma_carre)
+  mu_f = sigma_carre*(mu_0/sigma_0_carre + sum(x)/sigma_carre)
+  
+  tirage_lambda_1 <- rnorm(n=1,mean=mu_f,sd= sigma_carre_f)
+  
+  return(tirage_lambda_1)
+}
+```
+
+
+on crée la fonction qui va echantillonner avec une methode de gibbs à proprement parler 
+
+```{r}
+gibbs<- function(n_iterations) {
+  # Matrice pour stocker les échantillons
+  echantillons <- matrix(0, nrow = n_iterations, ncol = 5)
+  colnames(samples) <- c("lambda_1", "theta",  "P","T", "tau")
+  
+  # Initialisation
+  lambda_1 <- 0
+  T <- 0
+  P <- 0
+  tau <- 0
+  theta <- 0
+  y<- c(0,0)
+  
+  for (i in 1:n_iterations) {
+    # Tirages conditionnels
+    lambda_1 <- marginale_lambda_1(y,T, P, tau, theta)
+    T        <- marginale_T(y,lambda_1, P, tau, theta)
+    P        <- marginale_P(y,lambda_1, T, tau, theta)
+    tau      <- marginale_tau(y,lambda_1, T, P, theta)
+    theta    <- marginale_theta(y,lambda_1, T, P, tau)
+    
+    # Stockage des échantillons
+    samples[i, ] <- c(lambda_1, theta, P,T,  tau)
+  }
+  
+  return(samples)
+}
+
+```
+
