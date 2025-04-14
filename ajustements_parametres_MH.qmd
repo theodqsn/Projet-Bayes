@@ -1,0 +1,80 @@
+---
+title: "ajustement MH"
+format: html
+editor: visual
+---
+
+```{r}
+
+g <- function(x,mu=0,std=10){
+  if (x>=0){
+    return(2*dnorm(x,sd=std))
+  }
+  else{
+    return(0)
+  }
+}
+
+mh_demi_gauss <- function(lambda1,sigma0=10^6,std_k,N,theta0){
+  # On utilise un kernel gaussien
+  log_theta <- log(theta0)
+  lambda2 = c(1:N)
+  i <- 0
+  nbr_total = 0
+  while (i < N){
+    epsilon <- rnorm(n=1,mean=0,sd= std_k)
+    log_prop <- log_theta +epsilon
+    prop <- exp(log_prop)
+    theta <- exp(log_theta)
+    numerateur <-log_prop + log(g(prop, std=sigma0))
+    denominateur<- log_theta + log(g(theta, std=sigma0))
+    alpha <-exp(numerateur-denominateur)
+    u <- runif(n=1,0,1)
+    nbr_total <- nbr_total+1
+    if (u<=alpha){
+      i <- i+1
+      lambda2[i] <- (prop)+lambda1
+      log_theta <- log_prop
+    }
+    
+  }
+  attr(lambda2, "taux_acc") <- i/nbr_total
+  return(lambda2)
+  
+}
+```
+
+```{r}
+y=mh_demi_gauss(lambda1=0,sigma0=10^6, std_k=6, N=100000, theta0=1)
+hist(y, probability = TRUE, breaks = 100)
+library(ggplot2)
+
+
+y_mirror <- c(-y, y)  # on fait du mirroring comme on fait de la reconstruction à noyeaux sur un échantillon qui est sensé avoir une discontinuité dans sa densité (cf cours de QI)
+
+d_mirror <- density(y_mirror, bw = bw.nrd0(y), kernel = "gaussian")
+d_final <- list(x = d_mirror$x[d_mirror$x >= 0], 
+                y = 2 * d_mirror$y[d_mirror$x >= 0])  #on extrait la partie 
+
+plot(d_final, main = "Lissage par noyaux", type  = 'l')
+
+x=d_final$x
+y <- sapply(x, function(x) g(x, std= 10^6))
+plot(x, y, type = "l", col = "green", lwd = 2, 
+     main = "Comparaison avec la vrai densité")
+lines(x, d_final$y, col = "purple", lwd = 2, type='l')
+
+print(attr(y, "taux_acc"))
+plot(y, type='l')
+
+data <- data.frame(x = seq_along(y), y = y)  
+ggplot(data, aes(x = x, y = y)) +  
+  geom_point(color = "gray") +   
+  geom_smooth(method = "loess", span = 0.3, color = "red", se = FALSE)  # Courbe lissé
+
+```
+
+Après plusieurs essais, il s'avère que, pour une demi gaussienne avec un écart type de 10\^6, on a un taux d'acceptation raisonnable pour 2.5\<std_k (on rappelle qu'on est en echelle log)
+
+On observe que la densité obtenue est correcte (cf dernier tableau)\
+\
