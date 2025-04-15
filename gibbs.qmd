@@ -29,18 +29,10 @@ sigma_0_carre <-10^6
 sigma_carre <- 1/tau
 mu_0 = 0
 x <- ifelse(T == 1, y, y - theta)
-#print("x")
-#print(x)
 n<- length(x)
 
 sigma_carre_f = 1/(1/sigma_0_carre + n/sigma_carre)
 mu_f = sigma_carre_f*(mu_0/sigma_0_carre + sum(x)/sigma_carre)
-#x <- seq(-100, 100, length.out = 1000)  
-#y <- dnorm(x, mean = mu_f, sd = sigma_carre_f)
-
-#print('pour lambda')
-#print(mu_f)
-#print(sigma_carre_f)
 tirage_lambda_1 <- rnorm(n=1,mean=mu_f,sd= sigma_carre_f)
 
 return(tirage_lambda_1) }
@@ -59,13 +51,7 @@ marginale_theta <- function(y,lambda_1, T, P, tau){
   
   sigma_carre_f = 1/(1/sigma_0_carre + k/sigma_carre)
   mu_f = sigma_carre_f*(mu_0/sigma_0_carre + sum(x_tilde)/sigma_carre)
-  
-  
-  #print('pour theta')
-  #print(mu_f)
-  #print(sigma_carre_f)
-  #b <- replicate(1000, demi_gauss(mu_f, sigma_carre_f))
-  #plot(density(b))
+
   tirage_theta <- demi_gauss(mu_f, sigma_carre_f)
   return(tirage_theta)
 }
@@ -78,10 +64,6 @@ marginale_T<- function(y,lambda_1, P, tau, theta){
   n<-length(y)
   probas_gpe_1 <- (1-P)*dnorm(y, mean = lambda_1, sd=1/tau )
   probas_gpe_2 <- P*dnorm(y, mean = lambda_1 + theta, sd=1/tau )
-  #print('groupe 1')
-  #print(probas_gpe_1)
-  #print('groupe 2')
-  #print(probas_gpe_2)
   probas_gpe_1_norm <-probas_gpe_1/(probas_gpe_1+probas_gpe_2)
   probas_gpe_2_norm <-probas_gpe_2/(probas_gpe_1+probas_gpe_2) #on normalise 
 
@@ -107,7 +89,7 @@ marginale_P<-function(y,lambda_1, T, tau, theta,alpha){
   x_tilde <-y[T==2]
   k <- length(x_tilde)
   n<- length(y)
-  alpha_f <-c(1+k, 1+n-k)
+  alpha_f <-c(1+n-k, 1+k)
   tirage_P <- rdirichlet(1, alpha_f)
   return(tirage_P[1])
 }
@@ -144,8 +126,8 @@ gibbs<- function(n_iterations) {
   # Initialisation
   lambda_1 <- 0
   P <- 0.5
-  tau <- 0.01
-  theta <- 40
+  tau <- 0
+  theta <- 0
   
   
   y <-
@@ -159,20 +141,15 @@ gibbs<- function(n_iterations) {
 
   T <- ifelse(y > median(y), 2, 1)
   lambda_1 <- mean(y[T==1])
-  
   theta<- mean(y[T==2])-lambda_1
-  var = (min (var(y[T==1]), var(y[T==2])))
-  #print('tau')
-  #print(1/var)
-
+  var = (min (var(y[T==1]), var(y[T==2]))) #on choisit les premiers echantillons de cette manière pour eviter les valeurs abérrantes qui nous bloqueraient dès le début
 
   
   alpha <-
-    c(0.8, 0.8)
+    c(1, 1)
   
   for (i in 1:n_iterations) {
     # Tirages conditionnels
-    #print(T)
     lambda_1 <- marginale_lambda_1(y,T, P, tau, theta)
     theta    <- marginale_theta(y,lambda_1, T, P, tau)
     tau      <- marginale_tau(y,lambda_1, T, P, theta)
