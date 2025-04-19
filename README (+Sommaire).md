@@ -6,6 +6,5 @@ Une mixture gaussienne à deux composantes
 
 "eyes_explications.pdf" contient l'énoncé du sujet  
 "gibbs.qmd" contient le code de l'echantillonneur à proprement parler   
-"projet_bayes.pdf" contient les calculs des lois necessaires à l'echantilloneur, ainsi que les conclusions au vu des resultats  
-"justification_modèle.ipynb" contient quelques arguments servant à justifier le modèle proposé par l'énoncé  
+"projet_bayes_rapport.pdf" contient une explication de l'étude, les maths necessaires à l'echantilloneur, ainsi que les conclusions au vu des resultats  
 "Validation du modème ME" illustre, par une méthode à noyeaux, la pertinence d'un mélange gaussien comme modèle  
