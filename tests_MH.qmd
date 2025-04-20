@@ -1,0 +1,79 @@
+---
+title: "test"
+format: html
+editor: visual
+---
+
+```{r}
+g <- function(theta, x_tilde, tau, sigma0=10^3){
+  vraisemblance <- prod(dnorm(x_tilde, mean=theta, sd=sqrt(1/tau)))
+  a_priori <- dnorm(theta, mean=0, sd=sqrt(sigma0))
+  return(vraisemblance * a_priori)
+}
+
+mh_theta <- function(x_tilde, tau, sigma0=10^3, std_k, N, theta0){
+  log_theta <- log(theta0)
+  theta2 <- numeric(N)
+  i <- 0
+  nbr_total <- 0
+  
+  while (i < N){
+    epsilon <- rnorm(1, mean=0, sd=std_k)
+    log_prop <- log_theta + epsilon
+    prop <- exp(log_prop)
+    theta <- exp(log_theta)
+    
+    numerateur <- log_prop + log(g(prop, x_tilde, tau, sigma0))
+    denominateur <- log_theta + log(g(theta, x_tilde, tau, sigma0))
+    
+    alpha <- exp(numerateur - denominateur)
+    u <- runif(1)
+    nbr_total <- nbr_total + 1
+    
+    if (u <= alpha){
+      i <- i + 1
+      theta2[i] <- prop
+      log_theta <- log_prop
+    }
+  }
+  
+  attr(theta2, "taux_acc") <- i / nbr_total
+  return(theta2)
+}
+
+```
+
+```{r}
+#on se donne des données bidons pour le test
+x_tilde <- rnorm(20, mean=0.25)  # par exemple
+tau <- 1
+theta0 <- 1
+std_k <- 2
+N <- 10000
+
+
+
+
+sigma_0_carre <-10^6 
+sigma_carre <- 1/tau
+mu_0 = 0
+k <- length(x_tilde)
+sigma_carre_f = 1/(1/sigma_0_carre + k/sigma_carre)
+mu_f = sigma_carre_f*(mu_0/sigma_0_carre + sum(x_tilde)/sigma_carre)
+x <- rnorm(10000, mean=mu_f, sd = sj)
+
+
+# On appelle l'algorithme
+echantillons <- mh_theta(x_tilde, tau, 10^6,std_k, N, theta0)
+
+# On trace l'histogramme ainsi qu'une estimaiton de la densité
+hist(echantillons, breaks=50, probability=TRUE,
+     main="Histogramme des échantillons de theta",
+     xlab=expression(theta), col="lightblue", border="white")
+
+lines(density(echantillons), col="darkblue", lwd=2)
+
+plot(echantillons, type = 'l')
+print(attr(echantillons , "taux_acc"))
+```
+Pour un noyeau gaussien d'écart type 2 on s'est a priori débarassé de la suracceptation (on a un taux d'acceptation de 0.34e, et on ne perçoit pas d'autocorrélation dans le graphe de la chaîne de Markov)
