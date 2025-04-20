@@ -1,0 +1,208 @@
+---
+title: "Notebook final"
+format: html
+editor: visual
+---
+
+On definit une loi "demi gaussienne" dont on aura besoin dans la suite
+
+```{r}
+demi_gauss<-function(mu, var){
+  flag =TRUE
+  while(flag){  
+    val = rnorm(n=1,mean=mu, sd = sqrt(var))
+    if(val > 0){
+      flag=FALSE
+    }
+  }
+  return(val)
+}
+```
+
+
+
+on commence par definir les lois marginales
+
+Lambda 1
+
+```{r}
+marginale_lambda_1<- function(y,t, P, tau, theta){
+sigma_0_carre <-10^6 
+sigma_carre <- 1/tau
+mu_0 = 0
+x <- ifelse(t == 1, y, y - theta)
+n<- length(x)
+
+sigma_carre_f = 1/(1/sigma_0_carre + n/sigma_carre)
+mu_f = sigma_carre_f*(mu_0/sigma_0_carre + sum(x)/sigma_carre)
+tirage_lambda_1 <- rnorm(n=1,mean=mu_f,sd= sigma_carre_f)
+
+return(tirage_lambda_1) }
+```
+
+Theta
+
+```{r}
+marginale_theta <- function(y,lambda_1, t, P, tau){
+  x_tilde <-y[t==2]
+  x_tilde <- x_tilde-lambda_1
+  sigma_0_carre <-10^6 
+  sigma_carre <- 1/tau
+  mu_0 = 0
+  k <- length(x_tilde)
+  sigma_carre_f = 1/(1/sigma_0_carre + k/sigma_carre)
+  mu_f = sigma_carre_f*(mu_0/sigma_0_carre + sum(x_tilde)/sigma_carre)
+
+  tirage_theta <- demi_gauss( mu_f,(sigma_carre_f))
+  
+  return(tirage_theta)
+}
+```
+
+t
+
+```{r}
+marginale_t<- function(y,lambda_1, P, tau, theta){
+  n<-length(y)
+  probas_gpe_1 <- (1-P)*dnorm(y, mean = lambda_1, sd=1/tau )
+  probas_gpe_2 <- P*dnorm(y, mean = lambda_1 + theta, sd=1/tau )
+  probas_gpe_1_norm <-probas_gpe_1/(probas_gpe_1+probas_gpe_2)
+  probas_gpe_2_norm <-probas_gpe_2/(probas_gpe_1+probas_gpe_2) #on normalise 
+  tirage_vect <- function(p1, p2) {
+  n <- length(p1)
+  res <- numeric(n)
+  for (i in 1:n) {
+    res[i] <- sample(c(1, 2), size = 1, prob = c(p1[i], p2[i]))
+  }
+  return(res)
+  } 
+  
+  tirage_t<- tirage_vect(probas_gpe_1_norm, probas_gpe_2_norm)
+  tirage_t[1]<-1
+  tirage_t[48]<-2
+  return(tirage_t)
+}
+```
+
+P
+
+```{r}
+library(gtools)
+marginale_P<-function(y,lambda_1, t, tau, theta,alpha){
+  x_tilde <-y[t==2]
+  k <- length(x_tilde)
+  n<- length(y)
+  alpha_f <-c(1+n-k, 1+k)
+  tirage_P <- rdirichlet(1, alpha_f)
+  return(tirage_P[2])
+}
+```
+
+Tau
+
+```{r}
+marginale_tau<-function(y,lambda_1, t, P, theta){
+  x <- y - (t==2)*theta 
+  alpha = 0.001
+  beta = 0.001
+  n <-length(y)
+  alpha_f = alpha + n/2
+  beta_f = sum (  ((x-lambda_1)^2)/2 ) + beta
+  
+  tirage_tau <- rgamma(1, shape=alpha_f, rate=beta_f)
+  return(tirage_tau)
+}
+
+
+
+
+```
+
+
+vérifions qu'on ne s'est pas trompé sur quels paramètres entrer dans la fonction gamma pour tirer tau
+```{r}
+#
+x <- seq(0, 4, length.out = 1000)
+y <- dgamma(x, shape = 24, rate = 24*(3.80^2)) #on choisit les valeurs théoriques 
+plot(x, y, type = "l", col = "blue", lwd = 2, main = "Densité de la fonction Gamma", xlab = "x", ylab = "Densité")
+
+```
+```{r}
+x <- rgamma(1000, shape = 24, rate=(3.8^2)*24)
+print(mean(x))
+```
+
+
+
+
+on crée la fonction qui va echantillonner avec une methode de gibbs à proprement parler
+
+```{r}
+gibbs<- function(n_iterations) {
+  # Matrice pour stocker les échantillons
+  echantillons <- matrix(0, nrow = n_iterations, ncol = 5)
+  colnames(echantillons) <- c("lambda_1", "theta",  "P", "tau", "diff_p")
+  
+  # Initialisation
+  lambda_1 <- 0
+  P <- 0.5
+  tau <- 1
+  theta <- 0
+  
+  
+  y <-
+    c(529, 530, 532, 533.1, 533.4, 533.6, 533.7, 534.1, 534.8, 535.3, 
+      535.4, 535.9, 536.1, 536.3, 536.4, 536.6, 537, 537.4, 537.5, 
+      538.3, 538.5, 538.6, 539.4, 539.6, 540.4, 540.8, 542, 542.8, 
+      543, 543.5, 543.8, 543.9, 545.3, 546.2, 548.8, 548.7, 548.9, 
+      549, 549.4, 549.9, 550.6, 551.2, 551.4, 551.5, 551.6, 552.8, 
+      552.9, 553.2)
+  y<- y - 500
+  print(var(y))
+
+  t <- ifelse(y > median(y), 2, 1)
+  lambda_1 <- mean(y[t==1])
+  theta<- mean(y[t==2])-lambda_1
+  var = (min (var(y[t==1]), var(y[t==2]))) #on choisit les premiers echantillons de cette manière pour eviter les valeurs abérrantes qui nous bloqueraient dès le début
+
+  
+  alpha <-
+    c(1, 1)
+  
+for (i in 1:n_iterations) {
+  # Tirages conditionnels
+  lambda_1 <- marginale_lambda_1(y, t, P, tau, theta)
+  theta    <- marginale_theta(y, lambda_1, t, P, tau)
+  tau      <- marginale_tau(y, lambda_1, t, P, theta)
+  
+  u        <- marginale_P(y, lambda_1, t, tau, theta, alpha)
+  diff_p   <- abs(P - u)
+  P        <- u
+  t        <- marginale_t(y, lambda_1, P, tau, theta)
+  
+  if (i %% 10000 == 0) {
+    print(t)
+  }
+  
+  # Stockage des échantillons
+  echantillons[i, ] <- c(lambda_1, theta, P, tau, diff_p)
+}
+
+  return(echantillons)
+}
+
+```
+
+```{r}
+Y <- gibbs(10000)
+#print(mean(y[,'lambda_1']))
+
+```
+
+```{r}
+plot(Y[,'lambda_1'])
+plot(Y[,'theta'])
+plot(Y[,'tau'])
+plot(Y[, 'P'])
+```
+
